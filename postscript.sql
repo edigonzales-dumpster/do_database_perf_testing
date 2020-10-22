@@ -1,0 +1,8 @@
+GRANT USAGE ON SCHEMA ${dbschema} TO admin, gretl
+;
+GRANT SELECT ON ALL TABLES IN SCHEMA ${dbschema} TO gretl
+;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${dbschema} TO admin
+;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA ${dbschema} TO gretl, admin
+;

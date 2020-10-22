@@ -45,15 +45,51 @@ datasets.each { dataset ->
         dataFile = file(Paths.get(pathToUnzipFolder.toString(), datasetId+".xtf"))
         disableValidation = true
         deleteData = true
+        if (datasetId.equalsIgnoreCase("ch.so.arp.nutzungsplanung")) disableRounding = true
     }
 }
 
 task importAllData() {
-    description = "Aggregation task."
+    description = "Aggregation task (Datenimport)."
     dependsOn {
         tasks.findAll { task -> task.name.startsWith('importData_') }
     }
 }
 
 
-// DDL
+// DDL: Datenbankschema anlegen 
+datasets.each { dataset ->
+    def modelNames = dataset.models
+    def schema = dataset.dbschema
+    def datasetId = dataset.datasetId
+
+    task "schemaImport_$datasetId"(type: Ili2pgImportSchema) {
+        database = [dbUriDo, dbUserDoDdl, dbPwdDoDdl]
+        dbschema = schema
+        models = modelNames
+        defaultSrsCode = 2056 
+        createGeomIdx = true 
+        createFk = true
+        createFkIdx = true
+        createUnique = true
+        createEnumTabs = true
+        beautifyEnumDispName = true
+        createMetaInfo = true
+        createNumChecks = true
+        nameByTopic = true
+        strokeArcs = true
+    }
+
+    task "grant_$datasetId"(type: SqlExecutor, dependsOn: "schemaImport_$datasetId") {
+        database = [dbUriDo, dbUserDoDdl, dbPwdDoDdl]
+        sqlParameters = [dbschema:schema]
+        sqlFiles = ['postscript.sql']
+    }
+}
+
+task schemaImportAllData() {
+    description = "Aggregation task (Schema erstellen)."
+    dependsOn {
+        tasks.findAll { task -> task.name.startsWith('grant_') }
+    }
+}
