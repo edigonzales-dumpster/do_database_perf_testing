@@ -3,44 +3,54 @@ import ch.so.agi.gretl.api.TransferSet
 import java.nio.file.Paths
 import de.undercouch.gradle.tasks.download.Download
 
+apply from: "$rootDir/datasets.groovy"
+
 def pathToTempFolder = System.getProperty("java.io.tmpdir") + "/gretl-share/"
 def pathToUnzipFolder = Paths.get(pathToTempFolder, "unzip_data")
 
-task downloadMOpublic(type: Download) {
-    description = "Download Data"
-    src "https://s3.eu-central-1.amazonaws.com/ch.so.agi.geodata/ch.so.agi_mopublic_xtf.zip"
-    dest pathToTempFolder
-    overwrite true
+datasets.each { dataset ->
+    def modelNames = dataset.models
+    def schema = dataset.dbschema
+    def datasetId = dataset.datasetId
 
-    doLast {
-        println "File downloaded to: " + pathToTempFolder
-    }        
-}
+    task "downloadDataset_$datasetId"(type: Download) {
+        description = "Download Data: ${datasetId}"
+        src "https://s3.eu-central-1.amazonaws.com/ch.so.agi.geodata/${datasetId}_xtf.zip"
+        dest pathToTempFolder
+        overwrite true
 
-task unzipMOpublic(type: Copy, dependsOn: 'downloadMOpublic') {
-    description = "Unzip Data"
-    from zipTree(Paths.get(pathToTempFolder, "ch.so.agi_mopublic_xtf.zip"))
-    into file(pathToUnzipFolder)
-    include "**/*.xtf"
-    rename { String fileName ->
-        if (fileName.contains("ch.so.agi_mopublic")) {
-            return "ch.so.agi_mopublic.xtf"
-        }
-        return fileName
+        doLast {
+            println "File downloaded to: " + pathToTempFolder
+        }        
     }
 
-    doLast {
-        println "File unzipped to directory: " + pathToUnzipFolder
-    }    
+    task "unzipData_$datasetId"(type: Copy, dependsOn: "downloadDataset_$datasetId") {
+        description = "Unzip Data: ${datasetId}"
+        from zipTree(Paths.get(pathToTempFolder, datasetId+"_xtf.zip"))
+        into file(pathToUnzipFolder)
+        include "**/*.xtf"
+        rename { String fileName ->
+            if (fileName.contains(datasetId)) {
+                return datasetId+".xtf"
+            }
+            return fileName
+        }
+    }
+
+    task "importData_$datasetId"(type: Ili2pgImport, dependsOn: "unzipData_$datasetId") {
+        description = "Import Data: ${datasetId}"
+        database = [dbUriDo, dbUserDo, dbPwdDo]
+        dbschema = schema
+        models = modelNames
+        dataFile = file(Paths.get(pathToUnzipFolder.toString(), datasetId+".xtf"))
+        disableValidation = true
+        deleteData = true
+    }
 }
 
-task importMOpublic(type: Ili2pgImport, dependsOn: 'unzipMOpublic') {
-    description = "Import Data"
-    database = [dbUriDo, dbUserDo, dbPwdDo]
-    dbschema = "agi_mopublic_pub"
-    dataFile = file(Paths.get(pathToUnzipFolder.toString(), "ch.so.agi_mopublic.xtf"))
-    disableValidation = true
-    deleteData = true
+task importAllData() {
+    description = "Aggregation task."
+    dependsOn {
+        tasks.findAll { task -> task.name.startsWith('importData_') }
+    }
 }
-
-
