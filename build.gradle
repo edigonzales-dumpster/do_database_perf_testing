@@ -78,6 +78,7 @@ datasets.each { dataset ->
         createNumChecks = true
         nameByTopic = true
         strokeArcs = true
+        coalesceJson = true
     }
 
     task "grant_$datasetId"(type: SqlExecutor, dependsOn: "schemaImport_$datasetId") {
