@@ -54,3 +54,6 @@ task importAllData() {
         tasks.findAll { task -> task.name.startsWith('importData_') }
     }
 }
+
+
+// DDL
